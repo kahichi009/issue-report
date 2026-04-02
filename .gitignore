@@ -11,6 +11,7 @@ test_cron.sh
 # Generated Reports
 reports/daily/*.md
 reports/weekly/*.md
+reports/dashboard/*
 
 # Mac OS
 .DS_Store
