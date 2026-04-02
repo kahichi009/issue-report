@@ -14,3 +14,6 @@ reports/weekly/*.md
 
 # Mac OS
 .DS_Store
+
+# Setting Files
+.config.json

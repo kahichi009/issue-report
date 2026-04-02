@@ -62,7 +62,7 @@ def parse_date(date_str):
         return None
 
 
-def generate_weekly_report(config, output_dir):
+def generate_weekly_report(config, output_dir, by_label=False):
     """今週の target_date を基準に、リポジトリ別の集計を行う"""
     today = datetime.now().date()
     start_of_week = today - timedelta(days=today.weekday())
@@ -111,10 +111,48 @@ def generate_weekly_report(config, output_dir):
                 overdue_items.append(item)
 
         lines.append("### 📊 集計結果")
-        lines.append("| 🟢完了予定のタスク | ✅完了タスク | 🔴遅延タスク |")
-        lines.append("| :--------------: | :--------: | :--------: |")
-        lines.append(f"| {len(due_this_week_items)} | {len(completed_this_week_items)} | {len(overdue_items)} |")
-        lines.append("")
+        if by_label:
+            # ラベルごとに集計
+            label_stats = {}
+            def add_to_label(l_name, stat_type):
+                if l_name not in label_stats:
+                    label_stats[l_name] = {"due": 0, "completed": 0, "overdue": 0}
+                label_stats[l_name][stat_type] += 1
+
+            for item in due_this_week_items:
+                labels = item.get("labels", [])
+                if not labels:
+                    add_to_label("Unlabeled", "due")
+                for l in labels:
+                    add_to_label(l if isinstance(l, str) else l.get("name", str(l)), "due")
+
+            for item in completed_this_week_items:
+                labels = item.get("labels", [])
+                if not labels:
+                    add_to_label("Unlabeled", "completed")
+                for l in labels:
+                    add_to_label(l if isinstance(l, str) else l.get("name", str(l)), "completed")
+
+            for item in overdue_items:
+                labels = item.get("labels", [])
+                if not labels:
+                    add_to_label("Unlabeled", "overdue")
+                for l in labels:
+                    add_to_label(l if isinstance(l, str) else l.get("name", str(l)), "overdue")
+
+            lines.append("| Labels | 🟢完了予定のタスク | ✅完了タスク | 🔴遅延タスク |")
+            lines.append("| :------ | :--------------: | :--------: | :--------: |")
+            if not label_stats:
+                lines.append("| (データなし) | 0 | 0 | 0 |")
+            else:
+                for l_name, stats in sorted(label_stats.items()):
+                    lines.append(f"| {l_name} | {stats['due']} | {stats['completed']} | {stats['overdue']} |")
+            lines.append("")
+        else:
+            lines.append("| 🟢完了予定のタスク | ✅完了タスク | 🔴遅延タスク |")
+            lines.append("| :--------------: | :--------: | :--------: |")
+            lines.append(f"| {len(due_this_week_items)} | {len(completed_this_week_items)} | {len(overdue_items)} |")
+            lines.append("")
 
         lines.append("### 🟢 今週完了予定のタスク")
         if due_this_week_items:
@@ -157,6 +195,11 @@ def generate_weekly_report(config, output_dir):
 
 
 def main():
+    import argparse
+    parser = argparse.ArgumentParser(description="GitHub Projectから週次レポートを生成します。")
+    parser.add_argument("--by-label", action="store_true", help="集計結果の表をラベルごとにスライスして出力します。")
+    args = parser.parse_args()
+
     check_gh_auth()
     
     script_dir = Path(__file__).parent
@@ -165,7 +208,7 @@ def main():
     output_dir = base_dir / "reports" / "weekly"
     
     config = load_config(config_path)
-    generate_weekly_report(config, output_dir)
+    generate_weekly_report(config, output_dir, by_label=args.by_label)
 
 
 if __name__ == "__main__":

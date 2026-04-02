@@ -1,0 +1,9 @@
+{
+  "projects": [
+    {
+      "repo": "your_username/your_repo",
+      "owner": "your_username",
+      "project_number": 1
+    }
+  ]
+}
