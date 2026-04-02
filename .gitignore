@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.pyc
+
+# Local Config and Secrets
+config.json
+test_cron.sh
+.env
+.env.local
+
+# Generated Reports
+reports/daily/*.md
+reports/weekly/*.md
+
+# Mac OS
+.DS_Store

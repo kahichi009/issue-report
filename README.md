@@ -1,41 +1,85 @@
-# issue-report
-Create Daily Report and Weekly Report from GitHub issues.
+# GitHub Project Issue Reporter
 
----
-## **GitHub Issue/Project 報告ツール実装要件**
+GitHub CLI (`gh`) を利用して、複数のリポジトリとGitHub Project (V2) の進捗を報告する日次および週次のレポートを生成するツールセットです。
+Windows / Mac の環境差異や文字化けを考慮し、`pathlib` でのパス解決や `utf-8` 指定を徹底しています。
 
-### **1. システム構成と依存関係**
-* **実行環境:** Python 3.10+ (macOS / Windows 11 両対応)
-* **認証・データ取得:** GitHub CLI (`gh`) をラッパーとして使用。
-    * `gh project item-list` コマンドまたは GraphQL API を使用して、Project内のカスタムフィールド（`target_date`）を取得すること。
-* **ファイル操作:** * `pathlib` モジュールを使用し、OS固有のパス問題を回避。
-    * 全出力ファイルは `utf-8` エンコーディングで保存。
+## 構成
 
-### **2. `daily_report.py` (日次レポート) 仕様**
-* **入力:** プロジェクトID、リポジトリ名。
-* **抽出対象:** 直近24時間以内に更新があったIssue。
-* **必須表示項目:** * Issue番号 / タイトル
-    * ステータス
-    * **Assignees (担当者名)**
-    * `target_date` (Projectフィールド値)
-* **ロジック:** 担当者ごとにグループ化し、Markdown形式で `reports/daily/YYYY-MM-DD.md` に保存。
+- `config.json`: リポジトリと各プロジェクトの対応づけを定義する設定ファイル。
+- `scripts/daily_report.py`: 24時間以内の更新を抽出し、リポジトリごとに更新詳細を含めた表形式（Markdown）で日報を作成。
+- `scripts/weekly_report.py`: 今週の `target_date` を基準に、「完了予定数」と「遅延数（期限超過かつ未完了）」をリポジトリごとに集計。
+- `.github/copilot-instructions.md`: AIエージェントに `/daily`, `/weekly` スラッシュコマンドとして認識させるための指示。
 
-### **3. `weekly_report.py` (週次レポート) 仕様**
-* **入力:** プロジェクトID、リポジトリ名。
-* **抽出対象:** 指定した週（月〜日）の範囲に `target_date` が含まれるIssue。
-* **必須表示項目:**
-    * **完了予定Issue数:** `target_date` が今週の範囲内にある総数。
-    * **遅延Issue数:** `target_date` が本日以前であり、かつステータスが「完了（Done/Closed）」以外。
-    * 主要なトピックの要約（ステータスが更新されたもの）。
-* **制約:** **Assigneesは表示しない。**
-* **出力:** `reports/weekly/YYYY-MM-W(週番号).md` に保存。
+## 設定
 
-### **4. スラッシュコマンド・インターフェース要件**
-以下の定義を含む `.github/copilot-instructions.md` を作成すること。
+このツールセットは複数のリポジトリとプロジェクトを `config.json` で管理します。
+プロジェクト開始前にルートディレクトリの `config.json` を編集してください。
 
-* **`/daily`**: 
-    1. `python scripts/daily_report.py` を実行。
-    2. 生成されたMarkdownの内容をVS Code Chat内にプレビュー表示。
-* **`/weekly`**: 
-    1. `python scripts/weekly_report.py` を実行。
-    2. 週次サマリをChat内に表示し、上長報告用のテキストとして整形。
+**`config.json` の例:**
+```json
+{
+  "projects": [
+    {
+      "repo": "organization/repoA",
+      "owner": "organization",
+      "project_number": 1
+    },
+    {
+      "repo": "your_username/your_repo",
+      "owner": "your_username",
+      "project_number": 2
+    }
+  ]
+}
+```
+
+## 事前準備（認証が必要）
+
+GitHub CLI を介して Project データを取得するため、認証が確実に設定されている必要があります。
+プログラム内部で `gh auth status` を使って認証チェックを行います。
+
+### 認証方法（どちらかを行ってください）
+- **ローカル環境**: コマンドプロンプトやターミナルで `gh auth login` を実行し、ブラウザで認証します。権限が足りない場合は `gh auth refresh -s project` を実行してスコープを追加してください。
+- **自動実行環境**: `GH_TOKEN` 環境変数に、必要な権限（`repo`, `read:org`, `project` など）を持ったパーソナルアクセストークン（PAT）を設定します。
+
+## 実行トリガー（3つの方法をサポート）
+
+### 1. 手動でのスクリプト実行
+
+コマンドライン（ターミナル・PowerShell・コマンドプロンプト）から直接実行します。設定は `config.json` から自動で読み込まれます。
+
+```bash
+# 日次レポートの作成
+python scripts/daily_report.py
+
+# 週次レポートの作成
+python scripts/weekly_report.py
+```
+
+生成されたレポートは `reports/daily/` および `reports/weekly/` 内に `YYYY-MM-DD.md` の形式で保存されます。
+
+### 2. AIエージェントからの起動（スラッシュコマンド）
+
+Copilot Chat などのAIアシスタント機能を有しているエディタ（VS Codeなど）で、`.github/copilot-instructions.md` の記述を利用してチャットから実行できます。
+- `@workspace /daily 実行して` と指示するとAIが上記コマンドを自動実行します。
+
+### 3. Windowsタスクスケジューラからの定時起動
+
+Windowsタスクスケジューラから毎朝や毎週自動実行させる場合は、以下のようなバッチファイル (`run_daily.bat` など) を用意してタスクを登録してください。
+タスクスケジューラは非対話的環境で実行されるため、必ず `GH_TOKEN` を設定し、カレントディレクトリに依存しないように絶対パスを使用するか `cd` を使います。
+
+**バッチファイルの例 (run_daily.bat):**
+```bat
+@echo off
+:: 文字化け防止
+chcp 65001 >nul
+
+:: トークン（必須）
+set GH_TOKEN=ghp_YourPersonalAccessTokenHere
+
+:: スクリプトが配置されているディレクトリに移動
+cd /d "C:\path\to\issue-report"
+
+:: Pythonスクリプトの実行（python のパスが通っていない場合は絶対パスを指定）
+python scripts\daily_report.py
+```
