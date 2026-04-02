@@ -1,0 +1,138 @@
+
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GitHub Projects Dashboard</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: rgba(30, 41, 59, 0.7);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent: #38bdf8;
+            --success: #4ade80;
+            --danger: #f87171;
+            --border: rgba(255, 255, 255, 0.1);
+        }
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: 'Inter', 'Segoe UI', sans-serif;
+            margin: 0; padding: 20px 10px;
+            font-size: 14px;
+            background-image: radial-gradient(circle at top right, #1e293b, transparent 40%),
+                              radial-gradient(circle at bottom left, #0f172a, transparent 40%);
+            min-height: 100vh;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        .header {
+            display: flex; justify-content: space-between; align-items: flex-end;
+            border-bottom: 1px solid var(--border); padding-bottom: 10px; margin-bottom: 20px;
+        }
+        .header h1 { margin: 0; font-size: 1.8em; background: -webkit-linear-gradient(45deg, var(--accent), var(--success)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .header p { margin: 0; color: var(--text-muted); font-size: 0.9em; }
+        
+        .glass-card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border);
+            padding: 15px 20px;
+            margin-bottom: 20px;
+            transition: transform 0.2s;
+        }
+        .glass-card:hover { transform: translateY(-2px); }
+        .card-title { margin-top: 0; font-size: 1.25em; border-bottom: 1px solid var(--border); padding-bottom: 8px; margin-bottom: 15px; display: flex; align-items: center; gap: 8px; }
+        
+        .stat-grid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-bottom: 15px;
+        }
+        .stat-box {
+            text-align: center; padding: 12px; background: rgba(0,0,0,0.2); border-radius: 10px; border: 1px solid rgba(255,255,255,0.05);
+        }
+        .stat-box h3 { margin: 0 0 5px 0; font-size: 0.85em; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
+        .stat-num { font-size: 2.2em; font-weight: 800; color: var(--text-main); line-height: 1; }
+        .stat-num.alert { color: var(--danger); text-shadow: 0 0 10px rgba(248, 113, 113, 0.5); }
+        .stat-num.good { color: var(--success); }
+        
+        table { width: 100%; border-collapse: collapse; font-size: 0.95em; }
+        th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--border); }
+        th { color: var(--text-muted); font-weight: 500; text-transform: uppercase; font-size: 0.8em; letter-spacing: 0.5px; }
+        tr:last-child td { border-bottom: none; }
+        tr:hover td { background: rgba(255,255,255,0.02); }
+        
+        a { color: var(--accent); text-decoration: none; transition: opacity 0.2s; }
+        a:hover { opacity: 0.8; text-decoration: underline; }
+        
+        .badge {
+            display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 0.75em; font-weight: 600;
+            background: rgba(255,255,255,0.1); margin-right: 4px; margin-bottom: 4px;
+        }
+        .badge.todo { background: rgba(148, 163, 184, 0.2); color: #cbd5e1; border: 1px solid rgba(148, 163, 184, 0.3); }
+        .badge.done { background: rgba(52, 211, 153, 0.2); color: #6ee7b7; border: 1px solid rgba(52, 211, 153, 0.3); }
+        .badge.bug { background: rgba(248, 113, 113, 0.2); color: #fca5a5; border: 1px solid rgba(248, 113, 113, 0.3); }
+        
+        .empty-state { text-align: center; color: var(--text-muted); padding: 20px; font-style: italic; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 GitHub Projects Dashboard</h1>
+            <p>Last Updated: 2026-04-03 08:07</p>
+        </div>
+        
+        <div class="glass-card">
+            <h2 class="card-title">📦 kahichi009/homework-hero</h2>
+            <div class="stat-grid">
+                <div class="stat-box">
+                    <h3>Total Active Issues</h3>
+                    <div class="stat-num">9</div>
+                </div>
+                <div class="stat-box">
+                    <h3>Due This Week</h3>
+                    <div class="stat-num">2</div>
+                </div>
+                <div class="stat-box">
+                    <h3>Overdue Tasks</h3>
+                    <div class="stat-num good">0</div>
+                </div>
+            </div>
+            
+            <h3>📋 Action Required</h3>
+            <table>
+                <tr><th>Assignee</th><th>Issue Title</th><th>Status</th><th>Labels</th><th>Target Date</th></tr>
+                <tr><td>Unassigned</td><td><a href='https://github.com/kahichi009/homework-hero/issues/13' target='_blank'>チケット交換したあとに宿題を未完了に戻すとポイントが再付与できてしまう</a></td><td><span class="badge todo">In Progress</span></td><td><span class="badge ">documentation</span></td><td>2026-04-03</td></tr><tr><td>Unassigned</td><td><a href='https://github.com/kahichi009/homework-hero/issues/23' target='_blank'>スケジュール自動登録機能のロジックをアプリから変更可能にする</a></td><td><span class="badge done">Done</span></td><td><span class="badge ">documentation</span></td><td>2026-04-03</td></tr><tr><td>Unassigned</td><td><a href='https://github.com/kahichi009/homework-hero/issues/25' target='_blank'>「かんり」ボタンでパスワードを入れても次に進まない</a></td><td><span class="badge todo">Todo</span></td><td><span class="badge bug">bug</span></td><td>2026-04-03</td></tr>
+            </table>
+        </div>
+        
+        <div class="glass-card">
+            <h2 class="card-title">📦 kahichi009/gamarks</h2>
+            <div class="stat-grid">
+                <div class="stat-box">
+                    <h3>Total Active Issues</h3>
+                    <div class="stat-num">3</div>
+                </div>
+                <div class="stat-box">
+                    <h3>Due This Week</h3>
+                    <div class="stat-num">2</div>
+                </div>
+                <div class="stat-box">
+                    <h3>Overdue Tasks</h3>
+                    <div class="stat-num alert">1</div>
+                </div>
+            </div>
+            
+            <h3>📋 Action Required</h3>
+            <table>
+                <tr><th>Assignee</th><th>Issue Title</th><th>Status</th><th>Labels</th><th>Target Date</th></tr>
+                <tr><td>kahichi009</td><td><a href='https://github.com/kahichi009/gamarks/issues/1' target='_blank'>test1</a></td><td><span class="badge todo">Todo</span></td><td></td><td><span style="color:var(--danger)">2026-04-01 (遅延)</span></td></tr><tr><td>Unassigned</td><td><a href='https://github.com/kahichi009/gamarks/issues/3' target='_blank'>test3</a></td><td><span class="badge todo">Todo</span></td><td></td><td>2026-04-03</td></tr>
+            </table>
+        </div>
+        
+    </div>
+</body>
+</html>
