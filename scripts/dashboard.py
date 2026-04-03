@@ -1,4 +1,5 @@
 import sys
+import argparse
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
@@ -21,6 +22,7 @@ HTML_TEMPLATE = """
             --text-muted: #94a3b8;
             --accent: #38bdf8;
             --success: #4ade80;
+            --warning: #fbbf24;
             --danger: #f87171;
             --border: rgba(255, 255, 255, 0.1);
         }
@@ -41,6 +43,10 @@ HTML_TEMPLATE = """
         }
         .header h1 { margin: 0; font-size: 1.8em; background: -webkit-linear-gradient(45deg, var(--accent), var(--success)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
         .header p { margin: 0; color: var(--text-muted); font-size: 0.9em; }
+        
+        .mode-badge {
+            display: inline-block; padding: 4px 10px; border-radius: 12px; background: rgba(56, 189, 248, 0.2); border: 1px solid var(--accent); color: var(--accent); font-weight: bold; margin-left: 10px; font-size: 0.8em; vertical-align: middle;
+        }
         
         .glass-card {
             background: var(--card-bg);
@@ -65,6 +71,7 @@ HTML_TEMPLATE = """
         .stat-num { font-size: 2.2em; font-weight: 800; color: var(--text-main); line-height: 1; }
         .stat-num.alert { color: var(--danger); text-shadow: 0 0 10px rgba(248, 113, 113, 0.5); }
         .stat-num.good { color: var(--success); }
+        .stat-num.warning { color: var(--warning); }
         
         table { width: 100%; border-collapse: collapse; font-size: 0.95em; }
         th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--border); }
@@ -89,7 +96,7 @@ HTML_TEMPLATE = """
 <body>
     <div class="container">
         <div class="header">
-            <h1>🚀 GitHub Projects Dashboard</h1>
+            <h1>🚀 GitHub Projects Dashboard {mode_badge}</h1>
             <p>Last Updated: {date}</p>
         </div>
         {content}
@@ -104,7 +111,7 @@ def parse_date(date_str):
     except Exception:
         return None
 
-def generate_dashboard():
+def generate_dashboard(mode="target_date"):
     check_gh_auth()
     script_dir = Path(__file__).parent
     base_dir = script_dir.parent
@@ -119,6 +126,10 @@ def generate_dashboard():
     cards_html = []
     
     for proj in config.get("projects", []):
+        proj_modes = proj.get("modes", ["target_date", "sprint"])
+        if mode not in proj_modes:
+            continue
+            
         repo = proj.get("repo", "Unknown Repo")
         owner = proj.get("owner")
         project_number = proj.get("project_number")
@@ -129,7 +140,10 @@ def generate_dashboard():
         overdue_items = []
         due_this_week_items = []
         
-        # HTML Table Rows
+        done_items = []
+        in_progress_items = []
+        todo_items = []
+        
         table_rows = []
         
         for item in items:
@@ -141,20 +155,33 @@ def generate_dashboard():
             
             status = str(item.get("status", "")).lower()
             is_done = "done" in status or "完了" in status
+            is_in_progress = "progress" in status or "進行中" in status
             
-            target_date_str = item.get("target_date")
-            target_date = parse_date(str(target_date_str)) if target_date_str else None
-            
-            is_overdue = False
-            if target_date and not is_done and target_date < today:
-                is_overdue = True
-                overdue_items.append(item)
-            
-            if target_date and start_of_week <= target_date <= end_of_week and not is_done:
-                due_this_week_items.append(item)
+            if mode == "sprint":
+                if is_done:
+                    done_items.append(item)
+                elif is_in_progress:
+                    in_progress_items.append(item)
+                else:
+                    todo_items.append(item)
+                    
+                is_overdue = False # Disabled in sprint mode
+                should_render_table = not is_done
+            else:
+                target_date_str = item.get("target_date")
+                target_date = parse_date(str(target_date_str)) if target_date_str else None
                 
-            # Render Table Content only for Overdue or Due this week (or Active)
-            if (target_date and start_of_week <= target_date <= end_of_week) or is_overdue:
+                is_overdue = False
+                if target_date and not is_done and target_date < today:
+                    is_overdue = True
+                    overdue_items.append(item)
+                
+                if target_date and start_of_week <= target_date <= end_of_week and not is_done:
+                    due_this_week_items.append(item)
+                
+                should_render_table = (target_date and start_of_week <= target_date <= end_of_week) or is_overdue
+                
+            if should_render_table:
                 title = str(item.get("title", "No Title"))
                 url = item.get("content", {}).get("url", "#")
                 
@@ -171,56 +198,99 @@ def generate_dashboard():
                 assignee_names = [a.get("login") if isinstance(a, dict) else str(a) for a in assignees_data]
                 assignee_str = ", ".join(assignee_names) if assignee_names else "Unassigned"
                 
-                date_visual = f'<span style="color:var(--danger)">{target_date_str} (遅延)</span>' if is_overdue else str(target_date_str)
+                if mode == "target_date":
+                    target_date_str = item.get("target_date", "-")
+                    date_visual = f'<span style="color:var(--danger)">{target_date_str} (遅延)</span>' if is_overdue else str(target_date_str)
+                else:
+                    date_visual = "-"
+                    
                 row_html = f"<tr><td>{assignee_str}</td><td><a href='{url}' target='_blank'>{title}</a></td><td>{status_badge}</td><td>{labels_html}</td><td>{date_visual}</td></tr>"
                 table_rows.append(row_html)
         
-        overdue_num = len(overdue_items)
-        class_overdue = "alert" if overdue_num > 0 else "good"
+        table_content = "".join(table_rows) if table_rows else "<tr><td colspan='5' class='empty-state'>今対応すべきタスクはありません 🎉</td></tr>"
         
-        table_content = "".join(table_rows) if table_rows else "<tr><td colspan='5' class='empty-state'>今週対応すべきタスク・遅延タスクはありません 🎉</td></tr>"
-        
-        card = f"""
-        <div class="glass-card">
-            <h2 class="card-title">📦 {repo}</h2>
-            <div class="stat-grid">
-                <div class="stat-box">
-                    <h3>Total Active Issues</h3>
-                    <div class="stat-num">{total_count}</div>
-                </div>
-                <div class="stat-box">
-                    <h3>Due This Week</h3>
-                    <div class="stat-num">{len(due_this_week_items)}</div>
-                </div>
-                <div class="stat-box">
-                    <h3>Overdue Tasks</h3>
-                    <div class="stat-num {class_overdue}">{overdue_num}</div>
-                </div>
-            </div>
+        if mode == "sprint":
+            todo_num = len(todo_items)
+            class_todo = "alert" if todo_num > 0 else "good"
             
-            <h3>📋 Action Required</h3>
-            <table>
-                <tr><th>Assignee</th><th>Issue Title</th><th>Status</th><th>Labels</th><th>Target Date</th></tr>
-                {table_content}
-            </table>
-        </div>
-        """
+            card = f"""
+            <div class="glass-card">
+                <h2 class="card-title">📦 {repo}</h2>
+                <div class="stat-grid">
+                    <div class="stat-box">
+                        <h3>Done</h3>
+                        <div class="stat-num good">{len(done_items)}</div>
+                    </div>
+                    <div class="stat-box">
+                        <h3>In Progress</h3>
+                        <div class="stat-num warning">{len(in_progress_items)}</div>
+                    </div>
+                    <div class="stat-box">
+                        <h3>Todo / Other</h3>
+                        <div class="stat-num {class_todo}">{todo_num}</div>
+                    </div>
+                </div>
+                
+                <h3>📋 Action Required (In Progress / Todo)</h3>
+                <table>
+                    <tr><th>Assignee</th><th>Issue Title</th><th>Status</th><th>Labels</th><th>Target Date</th></tr>
+                    {table_content}
+                </table>
+            </div>
+            """
+        else:
+            overdue_num = len(overdue_items)
+            class_overdue = "alert" if overdue_num > 0 else "good"
+            
+            card = f"""
+            <div class="glass-card">
+                <h2 class="card-title">📦 {repo}</h2>
+                <div class="stat-grid">
+                    <div class="stat-box">
+                        <h3>Total Active Issues</h3>
+                        <div class="stat-num">{total_count}</div>
+                    </div>
+                    <div class="stat-box">
+                        <h3>Due This Week</h3>
+                        <div class="stat-num">{len(due_this_week_items)}</div>
+                    </div>
+                    <div class="stat-box">
+                        <h3>Overdue Tasks</h3>
+                        <div class="stat-num {class_overdue}">{overdue_num}</div>
+                    </div>
+                </div>
+                
+                <h3>📋 Action Required (Due / Overdue)</h3>
+                <table>
+                    <tr><th>Assignee</th><th>Issue Title</th><th>Status</th><th>Labels</th><th>Target Date</th></tr>
+                    {table_content}
+                </table>
+            </div>
+            """
         cards_html.append(card)
         
     final_content = "".join(cards_html)
     if not final_content:
         final_content = "<div class='glass-card empty-state'>No Project Configurations Found.</div>"
         
-    html = HTML_TEMPLATE.replace("{date}", now_str).replace("{content}", final_content)
+    mode_str = "TARGET DATE MODE" if mode == "target_date" else "SPRINT MODE"
+    mode_badge = f'<span class="mode-badge">{mode_str}</span>'
+    html = HTML_TEMPLATE.replace("{date}", now_str).replace("{content}", final_content).replace("{mode_badge}", mode_badge)
+
     
     out_dir = base_dir / "reports" / "dashboard"
     out_dir.mkdir(parents=True, exist_ok=True)
-    out_path = out_dir / "index.html"
+    
+    filename = "index.html" if mode == "target_date" else f"index_{mode}.html"
+    out_path = out_dir / filename
     
     with out_path.open("w", encoding="utf-8") as f:
         f.write(html)
         
-    print(f"ダッシュボードを生成しました: {out_path}")
+    print(f"ダッシュボードを生成しました (Mode: {mode}): {out_path}")
 
 if __name__ == "__main__":
-    generate_dashboard()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--mode", choices=["target_date", "sprint"], default="target_date")
+    args = parser.parse_args()
+    generate_dashboard(mode=args.mode)
